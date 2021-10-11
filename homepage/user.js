@@ -559,7 +559,7 @@ function post() {
         type: "POST",
         data: JSON.stringify(image),
         //tên API
-        url: "https://https://nevergiverup.herokuapp.com//user/createPost",
+        url: "https://nevergiverup.herokuapp.com/user/createPost",
         //xử lý khi thành công
         success: function (data) {
             document.getElementById("uploadfile").value = "";
