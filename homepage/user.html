@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/4.2.0/firebase.js"></script>
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        #wraper {
+
+        }
+
+        #header {
+            width: 100%;
+            height: 20%;
+            background-color: #2bb3c0;
+            position: fixed;
+            top: 0px;
+            left: 0;
+        }
+
+        #friend {
+            height: 100%;
+            width: 20%;
+            background-color: #999999;
+            position: fixed;
+            top: 20%;
+            left: 0px;
+        }
+
+        #timeline {
+            margin-top: 20%;
+            padding: 20px;
+            height: 100%;
+            width: 600px;
+            position: absolute;
+            left: 350px;
+        }
+
+        #alert {
+            height: 100%;
+            width: 20%;
+            background-color: #999999;
+            position: fixed;
+            top: 20%;
+            right: 0px;
+        }
+    </style>
+</head>
+<body>
+<div id="wraper">
+    <div id="header">
+        <table>
+            <tr>
+                <td>
+                    <div id="avatarUser"></div>
+                </td>
+                <td>
+                    <div id="nameUser" onclick="showUserDetail()"></div>
+                </td>
+            </tr>
+        </table>
+        <table id="reloadAvatar">
+            <tr>
+                <td>
+                    <input type="file" value="Thay avatar" accept=".jpg" id="fileButtonAv">
+                    <input type="hidden" id="imageAv">
+                </td>
+                <td id="closeupload">
+                    <button>Đóng</button>
+                </td>
+            </tr>
+        </table>
+        <table>
+            <tr>
+                <td>
+                    <input type="text" placeholder="Nhập email của bạn bè" id="email">
+                </td>
+                <td>
+                    <button onclick="searchFriend()">Tìm kiếm</button>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div id="refriend"></div>
+                </td>
+            </tr>
+        </table>
+        <button onclick="logout()" type="button">Đăng xuất</button>
+        <button onclick="homepage()" type="button">Trang chủ</button>
+
+    </div>
+    <div id="friend">
+
+    </div>
+    <div id="timeline">
+        <input type="hidden" id="page" value=0>
+        <div id="posts">
+            <div id="uploadfile"></div>
+            <input type="hidden" id="idPost">
+            <input id="content" type="text" placeholder="Bạn đang nghĩ gì?">
+            <select name="" id="privacy">
+                <option value="public">Public</option>
+                <option value="friend">Friend</option>
+                <option value="onlyme">Onlyme</option>
+            </select>
+            <input type="file" value="upload" accept=".jpg" id="fileButton">
+            <input type="hidden" id="image">
+            <button onclick="post()">Đăng bài</button>
+        </div>
+        <div id="listpost"></div>
+    </div>
+    <div id="alert">
+
+    </div>
+</div>
+<script>
+    $(document).ready(function () {
+        getListPost();
+        showUser();
+        showListFriend();
+        showListAddFriend();
+        $('#reloadAvatar').hide();
+    })
+    $('#avatarUser').click(function () {
+        $("#reloadAvatar").show();
+    });
+    $('#closeupload').click(function () {
+        $("#reloadAvatar").hide();
+    });
+
+    function showUserDetail() {
+        let idAcc = window.sessionStorage.getItem('ID_KEY');
+        $.ajax({
+            url: 'http://localhost:8080/user/showuserdetail/' + idAcc,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            success: function (data) {
+                let resulf = "";
+                if (data.length > 0) {
+                    for (let i = 0; i < data.length; i++) {
+                        resulf += '<div id="post' + data[i].id + '">';
+                        if (data[i].account.id == window.sessionStorage.getItem('ID_KEY')) {
+                            resulf +=
+                                '<table><tr style="width: 450px">' +
+                                '<td>' + data[i].account.fullName + '</td>' +
+                                '<td>     Trạng thái:' + data[i].privacy + '</td>' +
+                                '<td><button type="button" onclick="editPost(' + data[i].id + ')"> Sửa </button></td>' +
+                                '<td><button type="button" onclick="deletePost(' + data[i].id + ')"> Xóa </button></td>' +
+                                '</tr></table>';
+                        } else {
+                            resulf +=
+                                '<table><tr style="width: 450px">' +
+                                '<td>' + data[i].account.fullName + '</td>' +
+                                '<td>     Trạng thái:' + data[i].privacy + '</td>' +
+                                '</tr></table>';
+                        }
+                        resulf += '<p>' + data[i].conten + '</p>' +
+                            '<p><img width="560px" height="auto" src=' + data[i].imageList[0].path + '/></p>' +
+                            '<table><tr><td><p>' + data[i].likeList.length + '</p></td><td>Like</td><td> <p>' + data[i].commentList.length + '</p></td><td>Bình luận</td></tr></table>' +
+                            '<button type="button" onclick="createLike(' + data[i].id + ')"> Like </button>' +
+                            '<input type="text" id="comment' + data[i].id + '"/>' +
+                            '<button type="button" onclick="createCm(' + data[i].id + ')"> Bình luận </button>';
+                        for (let j = 0; j < data[i].commentList.length; j++) {
+                            resulf += '<p>' + data[i].commentList[j].account.fullName + '</p>' +
+                                '<p>' + data[i].commentList[j].content + '</p>';
+                            if (data[i].commentList[j].account.id == window.sessionStorage.getItem('ID_KEY')) {
+                                resulf += '<button type="button" onclick="deleteComment(' + data[i].commentList[j].id + ',' + data[i].id + ')"> Xóa </button>';
+                            }
+                        }
+                        resulf += '</div>';
+                    }
+
+                }
+                document.getElementById("listpost").innerHTML = resulf;
+            },
+            error: function () {
+                document.getElementById("listpost").innerHTML = "";
+            }
+        })
+        event.preventDefault();
+    }
+
+    function editPost(idPost) {
+    }
+
+    function deletePost(idPost) {
+        $.ajax({
+            url: 'http://localhost:8080/user/deletepost/' + idPost,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            success: function () {
+                homepage();
+            },
+            error: function () {
+                homepage();
+            }
+        })
+        event.preventDefault();
+    }
+
+    function homepage() {
+        $('#posts').show();
+        document.getElementById("listpost").innerHTML = "";
+        document.getElementById("page").value = 0;
+        getListPost();
+    }
+
+    function showListAddFriend() {
+        let idAcc = window.sessionStorage.getItem('ID_KEY');
+        $.ajax({
+            url: 'http://localhost:8080/user/showrequestfriend/' + idAcc,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            success: function (data) {
+                let result = "<table>";
+                for (let i = 0; i < data.length; i++) {
+                    result +=
+                        '<tr>' +
+                        '<td><img width="50px" height="50px" src=' + data[i].avatar.path + '/></td>' +
+                        '<td><p>' + data[i].fullName + '</p></td>' +
+                        '<td><button type="button" onclick="confirmFriend(' + data[i].id + ')"> Đồng ý </button></td>' +
+                        '</tr>';
+                }
+                result += "</table>";
+                document.getElementById('alert').innerHTML = result;
+            },
+            error: function () {
+                document.getElementById('alert').innerHTML = "";
+            }
+        })
+        event.preventDefault();
+    }
+
+    function confirmFriend(idFriend) {
+        let idAcc = window.sessionStorage.getItem('ID_KEY');
+        $.ajax({
+            url: 'http://localhost:8080/user/confirmfriend/' + idAcc + '/' + idFriend,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            success: function () {
+                showListFriend();
+                showListAddFriend();
+            },
+            error: function () {
+                showListFriend();
+                showListAddFriend();
+            }
+        })
+        event.preventDefault();
+    }
+
+    function showListFriend() {
+        let idAcc = window.sessionStorage.getItem('ID_KEY');
+        $.ajax({
+            url: 'http://localhost:8080/user/showfriend/' + idAcc,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            success: function (data) {
+                let result = "<table>";
+                for (let i = 0; i < data.length; i++) {
+                    result +=
+                        '<tr>' +
+                        '<td><img width="50px" height="50px" src=' + data[i].avatar.path + '/></td>' +
+                        '<td><p>' + data[i].fullName + '</p></td>' +
+                        '<td><button type="button"  onclick="showFriendDetail(' + data[i].id + ')"> Vào xem </button></td>' +
+                        '</tr>';
+                }
+                result += "</table>";
+                document.getElementById('friend').innerHTML = result;
+            },
+            error: function () {
+                document.getElementById('friend').innerHTML = "";
+            }
+        })
+        event.preventDefault();
+    }
+
+    function showFriendDetail(idFriend) {
+        $('#posts').hide();
+        $.ajax({
+            url: 'http://localhost:8080/user/showpostfriend/' + idFriend,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            success: function (data) {
+                let resulf = "";
+                if (data.length > 0) {
+                    for (let i = 0; i < data.length; i++) {
+                        console.log(data[i].account);
+                        resulf += '<div id="post' + data[i].id + '">';
+                        if (data[i].account.id == window.sessionStorage.getItem('ID_KEY')) {
+                            resulf +=
+                                '<table><tr style="width: 450px">' +
+                                '<td>' + data[i].account.fullName + '</td>' +
+                                '<td>     Trạng thái:' + data[i].privacy + '</td>' +
+                                '<td><button type="button" onclick="editPost(' + data[i].id + ')"> Sửa </button></td>' +
+                                '<td><button type="button" onclick="deletePost(' + data[i].id + ')"> Xóa </button></td>' +
+                                '</tr></table>';
+                        } else {
+                            resulf +=
+                                '<table><tr style="width: 450px">' +
+                                '<td>' + data[i].account.fullName + '</td>' +
+                                '<td>     Trạng thái:' + data[i].privacy + '</td>' +
+                                '</tr></table>';
+                        }
+                        resulf += '<p>' + data[i].conten + '</p>' +
+                            '<p><img width="560px" height="auto" src=' + data[i].imageList[0].path + '/></p>' +
+                            '<table><tr><td><p>' + data[i].likeList.length + '</p></td><td>Like</td><td> <p>' + data[i].commentList.length + '</p></td><td>Bình luận</td></tr></table>' +
+                            '<button type="button" onclick="createLike(' + data[i].id + ')"> Like </button>' +
+                            '<input type="text" id="comment' + data[i].id + '"/>' +
+                            '<button type="button" onclick="createCm(' + data[i].id + ')"> Bình luận </button>';
+                        for (let j = 0; j < data[i].commentList.length; j++) {
+                            resulf += '<p>' + data[i].commentList[j].account.fullName + '</p>' +
+                                '<p>' + data[i].commentList[j].content + '</p>';
+                            if (data[i].commentList[j].account.id == window.sessionStorage.getItem('ID_KEY')) {
+                                resulf += '<button type="button" onclick="deleteComment(' + data[i].commentList[j].id + ',' + data[i].id + ')"> Xóa </button>';
+                            }
+                        }
+                        resulf += '</div>';
+                    }
+
+                }
+                document.getElementById("listpost").innerHTML = resulf;
+            },
+            error: function () {
+                document.getElementById("listpost").innerHTML = "";
+            }
+        })
+        event.preventDefault();
+    };
+
+    function showUser() {
+        let image = '<img width="60px" height="auto" src=' + window.sessionStorage.getItem('AVATAR_KEY') + '/>';
+        let fullname = window.sessionStorage.getItem('FULLNAME_KEY')
+        document.getElementById('avatarUser').innerHTML = image;
+        document.getElementById('nameUser').innerText = fullname;
+    }
+
+    function logout() {
+        window.sessionStorage.removeItem('TOKEN_KEY');
+        window.sessionStorage.removeItem('ID_KEY');
+        window.sessionStorage.removeItem('FULLNAME_KEY');
+        window.sessionStorage.removeItem('AVATAR_KEY');
+        window.location.assign('login.html');
+    }
+
+    function searchFriend() {
+        let email = $('#email').val();
+        let account = {email: email};
+        $.ajax({
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            data: JSON.stringify(account),
+            type: "POST",
+            url: 'http://localhost:8080/user/searchfriend',
+            success: function (data) {
+                let result = ""
+                result +=
+                    '<table><tr>' +
+                    '<td><img width="50px" height="50px" src=' + data.avatar.path + '/></td>' +
+                    '<td><p>' + data.fullName + '</p></td>' +
+                    '<td><button type="button"  onclick="addFriend(' + data.id + ')"> Gửi kết bạn </button></td>' +
+                    '</tr></table>';
+                document.getElementById('refriend').innerHTML = result;
+            },
+            error: function () {
+                let result = '<p>Không tìm thấy</p>';
+                document.getElementById('refriend').innerHTML = result;
+            }
+        })
+    }
+
+    function addFriend(idFriend) {
+        let idAcc = window.sessionStorage.getItem('ID_KEY');
+        $.ajax({
+            url: 'http://localhost:8080/user/sendaddfriend/' + idAcc + '/' + idFriend,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            success: function () {
+                document.getElementById('refriend').innerHTML = "";
+            },
+            error: function () {
+                document.getElementById('refriend').innerHTML = "";
+            }
+        })
+        event.preventDefault();
+    }
+
+    function getListPost() {
+        let page = $('#page').val();
+        $.ajax({
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            data: page,
+            type: "POST",
+            url: 'http://localhost:8080/user/timeline',
+            success: function (data) {
+                showPost(data);
+            }
+        })
+        event.preventDefault();
+    }
+
+    function showPost(data) {
+        let resulf = "";
+        if (data.content.length > 0) {
+            document.getElementById("page").value = data.number + 1;
+            $('#continueshow').remove();
+            for (let i = 0; i < data.content.length; i++) {
+                resulf += '<div id="post' + data.content[i].id + '">';
+                if (data.content[i].account.id == window.sessionStorage.getItem('ID_KEY')) {
+                    resulf +=
+                        '<table><tr style="width: 450px">' +
+                        '<td>' + data.content[i].account.fullName + '</td>' +
+                        '<td>     Trạng thái:' + data.content[i].privacy + '</td>' +
+                        '<td><button type="button" onclick="editPost(' + data.content[i].id + ')"> Sửa </button></td>' +
+                        '<td><button type="button" onclick="deletePost(' + data.content[i].id + ')"> Xóa </button></td>' +
+                        '</tr></table>';
+                } else {
+                    resulf +=
+                        '<table><tr style="width: 450px">' +
+                        '<td>' + data.content[i].account.fullName + '</td>' +
+                        '<td>     Trạng thái:' + data.content[i].privacy + '</td>' +
+                        '</tr></table>';
+                }
+                resulf += '<p>' + data.content[i].conten + '</p>' +
+                    '<p><img width="560px" height="auto" src=' + data.content[i].imageList[0].path + '/></p>' +
+                    '<table><tr><td><p>' + data.content[i].likeList.length + '</p></td><td>Like</td><td> <p>' + data.content[i].commentList.length + '</p></td><td>Bình luận</td></tr></table>' +
+                    '<button type="button" onclick="createLike(' + data.content[i].id + ')"> Like </button>' +
+                    '<input type="text" id="comment' + data.content[i].id + '"/>' +
+                    '<button type="button" onclick="createCm(' + data.content[i].id + ')"> Bình luận </button>';
+                for (let j = 0; j < data.content[i].commentList.length; j++) {
+                    resulf += '<p>' + data.content[i].commentList[j].account.fullName + '</p>' +
+                        '<p>' + data.content[i].commentList[j].content + '</p>';
+                    if (data.content[i].commentList[j].account.id == window.sessionStorage.getItem('ID_KEY')) {
+                        resulf += '<button type="button" onclick="deleteComment(' + data.content[i].commentList[j].id + ',' + data.content[i].id + ')"> Xóa </button>';
+                    }
+                }
+                resulf += '</div>';
+            }
+            if (!data.last) {
+                resulf += '<button type="button"  id="continueshow" onclick="continuePost()"> Xem Thêm </button>';
+            }
+        }
+
+        let divLocation = document.getElementById("listpost");
+        let element = document.createElement("div");
+        element.innerHTML = resulf;
+        divLocation.append(element);
+    }
+
+    function continuePost() {
+        getListPost();
+    }
+
+    function deleteComment(idComment, idPost) {
+        $.ajax({
+            url: 'http://localhost:8080/user/deletecomment/' + idComment,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            success: function () {
+                showRePost(idPost);
+            },
+            error: function () {
+                showRePost(idPost);
+            }
+        })
+        event.preventDefault();
+    }
+
+    function createLike(idPost) {
+        let idAcc = window.sessionStorage.getItem('ID_KEY');
+        $.ajax({
+            url: 'http://localhost:8080/user/likeshow/' + idAcc + '/' + idPost,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            dataType: 'json',
+            success: function () {
+                showRePost(idPost);
+            },
+            error: function () {
+                showRePost(idPost);
+            }
+        })
+        event.preventDefault();
+    }
+
+    function showRePost(idPost) {
+        $.ajax({
+            url: 'http://localhost:8080/user/findPost/' + idPost,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            success: function (data) {
+                let result = "";
+                if (data.account.id == window.sessionStorage.getItem('ID_KEY')) {
+                    result +=
+                        '<table><tr style="width: 450px">' +
+                        '<td>' + data.account.fullName + '</td>' +
+                        '<td>     Trạng thái:' + data.privacy + '</td>' +
+                        '<td><button type="button" onclick="editPost(' + data.id + ')"> Sửa </button></td>' +
+                        '<td><button type="button" onclick="deletePost(' + data.id + ')"> Xóa </button></td>' +
+                        '</tr></table>';
+                } else {
+                    result +=
+                        '<table><tr style="width: 450px">' +
+                        '<td>' + data.account.fullName + '</td>' +
+                        '<td>     Trạng thái:' + data.privacy + '</td>' +
+                        '</tr></table>';
+                }
+
+                result +=
+                    '<p>' + data.conten + '</p>' +
+                    '<p><img width="560px" height="auto" src=' + data.imageList[0].path + '/></p>' +
+                    '<table><tr><td><p>' + data.likeList.length + '</p></td><td>Like</td><td><p>' + data.commentList.length + '</p></td><td>Bình luận</td></tr></table>' +
+                    '<button type="button" onclick="createLike(' + data.id + ')"> Like </button>' +
+                    '<input type="text" id="comment' + data.id + '"/>' +
+                    '<button type="button" onclick="createCm(' + data.id + ')"> Bình luận </button>';
+                for (let j = 0; j < data.commentList.length; j++) {
+                    result += '<p>' + data.commentList[j].account.fullName + '</p>' +
+                        '<p>' + data.commentList[j].content + '</p>';
+                    if (data.commentList[j].account.id == window.sessionStorage.getItem('ID_KEY')) {
+                        result += '<button type="button" onclick="deleteComment(' + data.commentList[j].id + ',' + data.id + ')"> Xóa </button>';
+                    }
+                }
+                document.getElementById("post" + idPost).innerHTML = result;
+            }
+        })
+    }
+
+    function createCm(idPost) {
+        let idAcc = window.sessionStorage.getItem('ID_KEY');
+        let contentNew = document.getElementById('comment' + idPost).value;
+        let comment = {content: contentNew};
+        $.ajax({
+            url: 'http://localhost:8080/user/comment/' + idAcc + '/' + idPost,
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            data: JSON.stringify(comment),
+            success: function () {
+                showRePost(idPost);
+            },
+            error: function () {
+                showRePost(idPost);
+            }
+        })
+    }
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAW8VF35-_YFnNNBMT9RAjzCHj-SUqR8Uw",
+        authDomain: "filebase-70567.firebaseapp.com",
+        projectId: "filebase-70567",
+        storageBucket: "filebase-70567.appspot.com",
+        messagingSenderId: "370746607348",
+        appId: "1:370746607348:web:b17a663c94df4db78c00a1",
+        measurementId: "G-8VZX3F9WF8"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    //up anh bai post
+    let fbBucketName = 'images';
+    let fileButton = document.getElementById('fileButton');
+    fileButton.addEventListener('change', function (e) {
+        let file = e.target.files[0];
+        let storageRef = firebase.storage().ref(`${fbBucketName}/${file.name}`);
+        let uploadTask = storageRef.put(file);
+        uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED,
+            function (snapshot) {
+                switch (snapshot.state) {
+                    case firebase.storage.TaskState.PAUSED: // or 'paused'
+                        break;
+                    case firebase.storage.TaskState.RUNNING: // or 'running'
+                        break;
+                }
+            },
+            function (error) {
+                switch (error.code) {
+                    case 'storage/unauthorized':
+                        break;
+                    case 'storage/canceled':
+                        break;
+                    case 'storage/unknown':
+                        break;
+                }
+            }, function () {
+                let downloadURL = uploadTask.snapshot.downloadURL;
+
+                document.getElementById("uploadfile").innerHTML = '<img width="100px" height="auto" src=' + downloadURL + '/>';
+                document.getElementById("image").value = downloadURL;
+            });
+    });
+
+    //up avatar
+    let fbBucketNameAv = 'imagesAv';
+    let fileButtonAv = document.getElementById('fileButtonAv');
+    fileButtonAv.addEventListener('change', function (e) {
+        let file = e.target.files[0];
+        let storageRef = firebase.storage().ref(`${fbBucketNameAv}/${file.name}`);
+        let uploadTask = storageRef.put(file);
+        uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED,
+            function (snapshot) {
+                switch (snapshot.state) {
+                    case firebase.storage.TaskState.PAUSED: // or 'paused'
+                        break;
+                    case firebase.storage.TaskState.RUNNING: // or 'running'
+                        break;
+                }
+            },
+            function (error) {
+                switch (error.code) {
+                    case 'storage/unauthorized':
+                        break;
+                    case 'storage/canceled':
+                        break;
+                    case 'storage/unknown':
+                        break;
+                }
+            }, function () {
+                let path = uploadTask.snapshot.downloadURL;
+                let newAvatar = {path: path}
+                let idAcc = window.sessionStorage.getItem('ID_KEY');
+                $.ajax({
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+                    },
+                    type: "PUT",
+                    data: JSON.stringify(newAvatar),
+                    //tên API
+                    url: "http://localhost:8080/user/reloadAvatar/" + idAcc,
+                    //xử lý khi thành công
+                    success: function () {
+                        showUser();
+                    },
+                    error: function () {
+                        window.sessionStorage.removeItem('AVATAR_KEY');
+                        window.sessionStorage.setItem('AVATAR_KEY', path);
+                        showUser();
+                        window.location.reload();
+                    }
+                })
+            });
+    });
+
+    function post() {
+        let idPost = $('#idPost').val();
+        let content = $('#content').val();
+        let privacy = $('#privacy').val();
+        let timePost = new Date();
+        let img = $('#image').val();
+        let account = {id: window.sessionStorage.getItem('ID_KEY')}
+        let post = {conten: content, privacy: privacy, timePost: timePost, account: account}
+        let image = {path: img, post: post}
+
+        $.ajax({
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': window.sessionStorage.getItem('TOKEN_KEY')
+            },
+            type: "POST",
+            data: JSON.stringify(image),
+            //tên API
+            url: "http://localhost:8080/user/createPost",
+            //xử lý khi thành công
+            success: function (data) {
+                document.getElementById("uploadfile").value = "";
+                document.getElementById("content").value = "";
+                document.getElementById("privacy").value = "";
+                document.getElementById("image").value = "";
+                window.location.reload();
+            }
+
+        })
+        event.preventDefault();
+    }
+</script>
+</body>
+</html>
